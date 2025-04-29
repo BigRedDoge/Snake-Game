@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>     
 #include <stdlib.h>     
-#include "snake.h"
+#include "snake_part_1.h"
 
 #define SNAKE_START_LENGTH 5
 
