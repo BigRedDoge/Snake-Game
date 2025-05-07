@@ -1,31 +1,32 @@
 #include <curses.h> // Required for terminal screen manipulation (ncurses library)
 #include <unistd.h> // Required for usleep() function (pausing execution)
 #include <stdbool.h> // Required for boolean type (true/false)
-
-// Author: Ramsundhar Venkadesan
-
+#include <stdlib.h> // Required for srand and rand
 #include <time.h>
 
-struct {
+// Author: Ramsundhar Venkadesan, Sean Clifford
+
+
+struct Trophy {
     int x, y;
     int value; // 1 to 9
     time_t spawn_time;
     int lifespan; // in seconds
     bool active;
-} Trophy;
+};
 
-Trophy trophy;
+struct Trophy trophy;
+
 
 // Generate new trophy at random location
 void spawn_trophy(int screen_height, int screen_width, int snake_x[], int snake_y[], int length) {
-    srand(time(NULL));
     bool overlap;
     do {
         overlap = false;
         trophy.x = rand() % (screen_width - 2) + 1;
         trophy.y = rand() % (screen_height - 2) + 1;
         trophy.value = (rand() % 9) + 1;
-        trophy.lifespan = (rand() % 9) + 1;
+        trophy.lifespan = trophy.value;
         trophy.spawn_time = time(NULL);
         trophy.active = true;
 
@@ -60,7 +61,7 @@ bool is_reverse_direction(int new_direction, int current_direction);
 // --- Main Game Logic ---
 
 int main(void) {
-
+    srand(time(NULL));
 
     initscr();          // Initialize the ncurses library
     start_color();      // Enable color capabilities
@@ -68,7 +69,7 @@ int main(void) {
     curs_set(0);        // Hide the cursor
     keypad(stdscr, TRUE); // Enable reading special keys (like arrow keys)
     nodelay(stdscr, TRUE); // Make getch() non-blocking (doesn't wait for input)
-    timeout(100);       // Set a timeout for getch() in milliseconds (controls game speed)
+    timeout(0);       // Set a timeout for getch() in milliseconds (controls game speed)
 
     // Pair 1: Green snake on black background
     init_pair(1, COLOR_GREEN, COLOR_BLACK);
@@ -85,6 +86,7 @@ int main(void) {
     int snake_y_coords[MAX_SNAKE_LENGTH];
     int current_snake_length = INITIAL_SNAKE_LENGTH;
 
+    
     // Initialize the snake's starting position (horizontal line near top-left)
     for (int i = 0; i < current_snake_length; ++i) {
         snake_x_coords[i] = 5 - i; // Head starts at x=5, body extends left
@@ -120,6 +122,10 @@ int main(void) {
             }
         }
 
+        if (!trophy.active) {
+            spawn_trophy(screen_height, screen_width, snake_x_coords, snake_y_coords, current_snake_length);
+        }
+
         // Move the snake based on the current direction
         move_snake(snake_x_coords, snake_y_coords, current_snake_length, current_direction, screen_height, screen_width, &game_over);
 
@@ -137,13 +143,33 @@ int main(void) {
         }
         attroff(COLOR_PAIR(2)); // Turn off red color
 
+        // Draw the trophy
+        if (trophy.active) {
+            mvprintw(trophy.y, trophy.x, "%d", trophy.value); // Draw the trophy
+            if (time(NULL) - trophy.spawn_time >= trophy.lifespan) {
+                trophy.active = false; // Deactivate the trophy after its lifespan
+                mvprintw(trophy.y, trophy.x, " "); // Clear the trophy from the screen
+            }
+        }
+        
+        // Check if the snake eats the trophy
+        if (trophy.active && snake_x_coords[0] == trophy.x && snake_y_coords[0] == trophy.y) {
+            current_snake_length += trophy.value; // Increase snake length by trophy value
+            trophy.active = false; // Deactivate the trophy after eating
+        }
+
+        // Draw the snake
         attron(COLOR_PAIR(1)); // Use green color for snake
         draw_snake(snake_x_coords, snake_y_coords, current_snake_length);
         attroff(COLOR_PAIR(1)); // Turn off green color
 
         refresh(); // Update the physical screen with the changes
 
-        usleep(100000); // Pause to  to control game speed
+        if (current_snake_length >= (int)(screen_width / 2)) {
+            game_over = true;
+        }
+
+        usleep(200000 / current_snake_length); // Pause to  to control game speed
     }
 
     endwin(); // Restore terminal settings and exit ncurses mode
